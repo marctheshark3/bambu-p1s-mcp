@@ -1,0 +1,21 @@
+# Merge under mcp_servers in ~/.hermes/config.yaml on Spark (or wherever Hermes runs).
+# Prefer HTTP unless Hermes itself is on a host that can reach the printer.
+
+mcp_servers:
+  bambu:
+    url: "http://192.168.1.195:8765/mcp"
+    # Tailscale alternative:
+    # url: "http://100.123.149.116:8765/mcp"
+    headers:
+      Authorization: "Bearer ${BAMBU_MCP_TOKEN}"
+    timeout: 180
+    connect_timeout: 30
+
+# Stdio form — only if Hermes runs on the same LAN box as the printer:
+# mcp_servers:
+#   bambu:
+#     command: "/home/whaleshark/Documents/bambu-p1s-mcp/.venv/bin/bambu-p1s-mcp"
+#     args: []
+#     env: {}
+#     timeout: 180
+#     connect_timeout: 45

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "bambu": {
+      "command": "/home/whaleshark/Documents/bambu-p1s-mcp/.venv/bin/bambu-p1s-mcp"
+    }
+  }
+}

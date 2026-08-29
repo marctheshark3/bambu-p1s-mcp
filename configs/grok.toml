@@ -1,0 +1,14 @@
+# Drop into ~/.grok/config.toml (user scope). Do not commit a filled-in copy
+# with an access code. Stdio form is for Grok running on the MCP host.
+
+[mcp_servers.bambu]
+command = "/home/whaleshark/Documents/bambu-p1s-mcp/.venv/bin/bambu-p1s-mcp"
+startup_timeout_sec = 45
+tool_timeout_sec = 180
+# env is optional if the process loads repo .env / ~/.config/bambu-p1s-mcp/.env
+# env = { BAMBU_IP = "192.168.1.50", BAMBU_SERIAL = "01P00A...", BAMBU_ACCESS_CODE = "${BAMBU_ACCESS_CODE}" }
+
+# Remote form — Grok talks to a daemon already bound on this host:
+# [mcp_servers.bambu]
+# url = "http://127.0.0.1:8765/mcp"
+# headers = { Authorization = "Bearer ${BAMBU_MCP_TOKEN}" }

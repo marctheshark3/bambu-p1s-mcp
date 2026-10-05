@@ -1,7 +1,7 @@
 # Goal: harness-agnostic P1S MCP
 
 **Status:** implement in this repo. Do not wrap a Claude-only or Grok-only plugin.
-**Printer:** Bambu Lab P1S on LAN. MQTT `:8883`, implicit FTPS `:990`.
+**Printer:** Bambu Lab P1S on LAN. MQTT `:8883`, implicit FTPS `:990`, camera TLS `:6000`.
 **Handoff:** execute this file. Do not rediscover Bambu cloud APIs.
 
 Paste for the next agent:
@@ -55,9 +55,18 @@ All of these hold:
 
 - Cloud MQTT / Bambu Handy account login
 - Multi-printer fleet
-- Camera JPEG (port 6000) in v0.1
 - Vendoring Bambu Connect X.509 material
 - Starting a print while `gcode_state` is `RUNNING`
+
+## Camera extension
+
+The requested camera extension adds read-only `printer_camera_snapshot` and
+`printer_camera_stream` tools. Snapshots return native MCP images over either
+transport. The HTTP daemon serves `/camera`, `/camera/snapshot.jpg`, and
+`/camera/stream.mjpg`; camera data uses the same bearer authentication as `/mcp`.
+The viewer shell is public but contains no printer data or credentials. Keep the
+access code on the MCP host and share one camera connection per process.
+See the README for setup and the P1S camera's low frame rate.
 
 ## Printer prep
 

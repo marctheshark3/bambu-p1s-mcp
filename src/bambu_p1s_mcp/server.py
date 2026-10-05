@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Image
+from starlette.concurrency import run_in_threadpool
 
+from bambu_p1s_mcp.camera import get_camera
 from bambu_p1s_mcp.config import load_settings
 from bambu_p1s_mcp.ftp import list_files, tcp_probe, upload_file
 from bambu_p1s_mcp.guard import require_confirm
@@ -34,11 +36,12 @@ def _err(exc: BaseException) -> dict:
 
 @mcp.tool()
 def printer_doctor() -> dict:
-    """Check env, LAN ports, MQTT, FTPS, and slicer CLI. Does not print or change printer state."""
+    """Check env, LAN ports (including camera), MQTT, FTPS, and slicer CLI. Read-only."""
     settings = _settings()
     missing = settings.missing()
     mqtt_open = bool(settings.ip) and tcp_probe(settings.ip, settings.mqtt_port)
     ftp_open = bool(settings.ip) and tcp_probe(settings.ip, settings.ftp_port)
+    camera_open = bool(settings.ip) and tcp_probe(settings.ip, settings.camera_port)
     mqtt_ok = False
     mqtt_error = None
     ftp_ok = False
@@ -67,6 +70,7 @@ def printer_doctor() -> dict:
         "ports": {
             "mqtt_8883": mqtt_open,
             "ftps_990": ftp_open,
+            "camera_6000": camera_open,
         },
         "mqtt": {"connected": mqtt_ok, "error": mqtt_error, "status": status},
         "ftp": {"connected": ftp_ok, "error": ftp_error, "file_count": None if files is None else len(files)},
@@ -109,6 +113,43 @@ def printer_files(path: str = "/") -> dict:
         return {"ok": True, "path": path, "files": names}
     except Exception as exc:
         return _err(exc)
+
+
+@mcp.tool()
+async def printer_camera_snapshot():
+    """Read a new JPEG from the chamber camera, for visual inspection of the bed/print.
+
+    Read-only; works over stdio and HTTP. Requires LAN camera port 6000.
+    An image alone cannot guarantee the bed is clear or that a print is safe.
+    """
+    try:
+        frame = await run_in_threadpool(get_camera().snapshot)
+        return Image(data=frame.jpeg, format="jpeg")
+    except Exception as exc:
+        return _err(exc)
+
+
+@mcp.tool()
+def printer_camera_stream() -> dict:
+    """Describe the HTTP live viewer, MJPEG stream, and JPEG snapshot endpoints.
+
+    This tool returns connection instructions, not video. Start the HTTP daemon
+    (--http) on the printer LAN host, then open viewer_path on that host/port.
+    """
+    settings = _settings()
+    return {
+        "ok": True,
+        "requires_http_daemon": True,
+        "viewer_path": "/camera",
+        "mjpeg_path": "/camera/stream.mjpg",
+        "snapshot_path": "/camera/snapshot.jpg",
+        "auth_required": bool(settings.mcp_token),
+        "hint": (
+            "Use these paths on the same HTTP origin as /mcp, not the printer IP. "
+            "Enter BAMBU_MCP_TOKEN in the viewer when configured; API requests use Bearer auth. "
+            "The stock P1S camera is 720p at roughly 0.5 fps."
+        ),
+    }
 
 
 @mcp.tool()

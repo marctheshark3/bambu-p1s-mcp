@@ -33,3 +33,10 @@ def test_missing_env(monkeypatch):
         monkeypatch.delenv(key, raising=False)
     settings = load_settings()
     assert set(settings.missing()) == {"BAMBU_IP", "BAMBU_ACCESS_CODE", "BAMBU_SERIAL"}
+
+
+def test_camera_port(monkeypatch):
+    monkeypatch.delenv("BAMBU_CAMERA_PORT", raising=False)
+    assert load_settings().camera_port == 6000
+    monkeypatch.setenv("BAMBU_CAMERA_PORT", "16000")
+    assert load_settings().public_dict()["camera_port"] == 16000

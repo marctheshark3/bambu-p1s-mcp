@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P1S · Live camera</title>
+<style>
+  :root { color-scheme: dark; font: 16px/1.5 system-ui, sans-serif; background: #141719; color: #ebf0ee; }
+  body { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 600; }
+  p { color: #aebbb5; }
+  form { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 24px 0; }
+  label { display: flex; flex-direction: column; gap: 6px; }
+  input, button { font: inherit; border-radius: 6px; padding: 10px 14px; border: 1px solid #526059; }
+  input { background: #222927; color: inherit; max-width: 75vw; }
+  button { background: #80d7a8; color: #10271c; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #stop { background: transparent; color: inherit; }
+  #viewport { aspect-ratio: 16 / 9; background: #080a09; border: 1px solid #34413b; border-radius: 8px; display: grid; place-items: center; overflow: hidden; }
+  #viewport > * { grid-area: 1 / 1; }
+  img { width: 100%; height: 100%; object-fit: contain; }
+  #status { min-height: 24px; }
+  [hidden] { display: none !important; }
+</style>
+<h1>P1S · Live camera</h1>
+<p>Chamber view · 720p · About one frame every two seconds</p>
+<form id="controls">
+  <label id="token-label" hidden>Server token
+    <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="BAMBU_MCP_TOKEN">
+  </label>
+  <button id="start" type="submit">Start live view</button>
+  <button id="stop" type="button" disabled>Stop</button>
+</form>
+<div id="viewport">
+  <p id="placeholder">Start the live view to see the printer.</p>
+  <img id="camera" alt="Live view of the P1S print chamber" hidden>
+</div>
+<p id="status" role="status" aria-live="polite">Ready</p>
+<p id="token-note" hidden>The server token stays in this tab’s memory. Use the server token, not the printer’s access code.</p>
+<script>
+  const authRequired = __AUTH_REQUIRED__;
+  const form = document.querySelector('#controls');
+  const token = document.querySelector('#token');
+  const start = document.querySelector('#start');
+  const stop = document.querySelector('#stop');
+  const picture = document.querySelector('#camera');
+  const placeholder = document.querySelector('#placeholder');
+  const status = document.querySelector('#status');
+  document.querySelector('#token-label').hidden = !authRequired;
+  document.querySelector('#token-note').hidden = !authRequired;
+  let controller = null;
+  let imageUrl = null;
+  let retryTimer = null;
+
+  function clearImage(message) {
+    picture.hidden = true;
+    picture.removeAttribute('src');
+    if (imageUrl) URL.revokeObjectURL(imageUrl);
+    imageUrl = null;
+    placeholder.textContent = message;
+    placeholder.hidden = false;
+  }
+
+  function end() {
+    clearTimeout(retryTimer);
+    controller?.abort();
+    controller = null;
+    start.disabled = false;
+    stop.disabled = true;
+    clearImage('Live view stopped.');
+    status.textContent = 'Stopped';
+  }
+
+  async function connect() {
+    const active = new AbortController();
+    controller = active;
+    start.disabled = true;
+    stop.disabled = false;
+    status.textContent = 'Connecting…';
+    let reader;
+    try {
+      const headers = authRequired ? { Authorization: `Bearer ${token.value.trim()}` } : {};
+      const response = await fetch('./camera/stream.mjpg', {
+        headers, signal: active.signal, cache: 'no-store'
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          end();
+          status.textContent = 'Server token required or incorrect. Enter it and start again.';
+          token.focus();
+          return;
+        }
+        const failure = await response.json().catch(() => ({}));
+        throw new Error(failure.error || `Camera unavailable (${response.status})`);
+      }
+      reader = response.body.getReader();
+      let buffer = new Uint8Array(0);
+      let frameLength = null;
+      const decoder = new TextDecoder();
+      while (!active.signal.aborted) {
+        const { value, done } = await reader.read();
+        if (done) throw new Error('Camera disconnected');
+        const joined = new Uint8Array(buffer.length + value.length);
+        joined.set(buffer);
+        joined.set(value, buffer.length);
+        buffer = joined;
+        while (true) {
+          if (frameLength === null) {
+            let headerEnd = -1;
+            for (let i = 0; i + 3 < buffer.length; i++) {
+              if (buffer[i] === 13 && buffer[i + 1] === 10 && buffer[i + 2] === 13 && buffer[i + 3] === 10) {
+                headerEnd = i;
+                break;
+              }
+            }
+            if (headerEnd < 0) {
+              if (buffer.length > 4096) throw new Error('Invalid camera stream header');
+              break;
+            }
+            const header = decoder.decode(buffer.subarray(0, headerEnd));
+            const match = /Content-Length:\s*(\d+)/i.exec(header);
+            if (!match) throw new Error('Invalid camera stream header');
+            frameLength = Number(match[1]);
+            if (frameLength < 4 || frameLength > 8 * 1024 * 1024) throw new Error('Invalid camera frame size');
+            buffer = buffer.slice(headerEnd + 4);
+          }
+          if (buffer.length < frameLength) break;
+          const nextUrl = URL.createObjectURL(new Blob([buffer.slice(0, frameLength)], { type: 'image/jpeg' }));
+          buffer = buffer.slice(frameLength);
+          frameLength = null;
+          picture.src = nextUrl;
+          if (imageUrl) URL.revokeObjectURL(imageUrl);
+          imageUrl = nextUrl;
+          picture.hidden = false;
+          placeholder.hidden = true;
+          status.textContent = `Live · Frame received at ${new Date().toLocaleTimeString()}`;
+        }
+      }
+    } catch (error) {
+      if (!active.signal.aborted) {
+        clearImage('Camera unavailable. Reconnecting…');
+        status.textContent = `${error.message}. Retrying in 3 seconds…`;
+        retryTimer = setTimeout(connect, 3000);
+      }
+    } finally {
+      if (reader) await reader.cancel().catch(() => {});
+    }
+  }
+
+  form.addEventListener('submit', event => { event.preventDefault(); end(); connect(); });
+  stop.addEventListener('click', end);
+  window.addEventListener('pagehide', end);
+  if (!authRequired) connect();
+</script>
+</html>

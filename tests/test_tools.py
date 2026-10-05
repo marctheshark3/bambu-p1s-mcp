@@ -8,6 +8,8 @@ def test_tool_catalog():
         "printer_status",
         "printer_ams",
         "printer_files",
+        "printer_camera_snapshot",
+        "printer_camera_stream",
         "printer_pause",
         "printer_resume",
         "printer_stop",

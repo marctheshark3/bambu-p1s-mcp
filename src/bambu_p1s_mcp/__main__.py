@@ -21,6 +21,7 @@ def _doctor() -> int:
         "ports": {
             "mqtt": bool(settings.ip) and tcp_probe(settings.ip, settings.mqtt_port),
             "ftps": bool(settings.ip) and tcp_probe(settings.ip, settings.ftp_port),
+            "camera": bool(settings.ip) and tcp_probe(settings.ip, settings.camera_port),
         },
         "slicer": which_slicer(settings),
     }

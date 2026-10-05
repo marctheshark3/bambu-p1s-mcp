@@ -37,6 +37,7 @@ class Settings:
     model: str = "P1S"
     mqtt_port: int = 8883
     ftp_port: int = 990
+    camera_port: int = 6000
     mqtt_username: str = "bblp"
     slicer: str | None = None
     studio_config: Path | None = None
@@ -74,6 +75,7 @@ class Settings:
             "model": self.model,
             "mqtt_port": self.mqtt_port,
             "ftp_port": self.ftp_port,
+            "camera_port": self.camera_port,
             "slicer": self.slicer,
             "studio_config": str(self.studio_config) if self.studio_config else None,
             "machine_json": str(self.machine_json) if self.machine_json else None,
@@ -115,6 +117,7 @@ def load_settings() -> Settings:
         model=_first("BAMBU_MODEL", default="P1S") or "P1S",
         mqtt_port=int(_first("BAMBU_MQTT_PORT", default="8883") or "8883"),
         ftp_port=int(_first("BAMBU_FTP_PORT", default="990") or "990"),
+        camera_port=int(_first("BAMBU_CAMERA_PORT", default="6000") or "6000"),
         mqtt_username=_first("BAMBU_MQTT_USERNAME", default="bblp") or "bblp",
         slicer=_first("BAMBU_SLICER"),
         studio_config=studio,

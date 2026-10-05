@@ -8,7 +8,9 @@ Type=simple
 WorkingDirectory=%h/Documents/bambu-p1s-mcp
 EnvironmentFile=-%h/Documents/bambu-p1s-mcp/.env
 EnvironmentFile=-%h/.config/bambu-p1s-mcp/.env
-Environment=BAMBU_MCP_HOST=0.0.0.0
+# EnvironmentFile can override this for an authenticated private-network listener.
+Environment=BAMBU_MCP_HOST=127.0.0.1
+UMask=0077
 ExecStart=%h/Documents/bambu-p1s-mcp/.venv/bin/bambu-p1s-mcp --http
 Restart=on-failure
 RestartSec=5
